@@ -1,0 +1,23 @@
+services:
+  consul:
+    # Pinning a specific version avoids the "manifest unknown" error
+    image: consul:1.15.4
+    network_mode: "host"
+     
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
