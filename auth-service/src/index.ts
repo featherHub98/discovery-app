@@ -6,19 +6,21 @@ import { defineUser } from './models/User';
 import { createAuthRoutes } from './routes/authRoutes';
 import cors from 'cors';
 
-const   SERVICE_NAME = 'auth-service';
+const SERVICE_NAME = 'auth-service';
 const SERVICE_PORT = 3001;
+const PROFILE = process.env.PROFILE || 'dev';
 
 async function bootstrap() {
   const app: Express = express();
   app.use(express.json());
   app.use(cors());
 
-  console.log(`[${SERVICE_NAME}] Fetching configuration...`);
+  console.log(`[${SERVICE_NAME}] Fetching configuration (profile: ${PROFILE})...`);
+
   let config: any;
   try {
-
-    const response = await axios.get(`http://localhost:8888/config/${SERVICE_NAME}`);
+    const configUrl = `http://localhost:8888/${SERVICE_NAME}/${PROFILE}`;
+    const response = await axios.get(configUrl);
     config = response.data;
   } catch (err) {
     console.error('Failed to fetch config. Is config-server running?');
@@ -37,17 +39,15 @@ async function bootstrap() {
   );
 
   const UserModel = defineUser(sequelize);
-
   await sequelize.sync({ alter: true });
   console.log(`[${SERVICE_NAME}] Database connected & synced.`);
 
   app.use('/', createAuthRoutes(UserModel, config.jwt.secret));
 
-  const consulClient =new consul({ host: 'localhost', port: '8500' });
-  
+  const consulClient = new consul({ host: 'localhost', port: '8500' });
   await consulClient.agent.service.register({
     name: SERVICE_NAME,
-    address: '172.22.64.1', 
+    address: '172.22.64.1',
     port: SERVICE_PORT,
     check: {
       http: `http://172.22.64.1:${SERVICE_PORT}/health`,
@@ -56,8 +56,7 @@ async function bootstrap() {
   });
   console.log(`[${SERVICE_NAME}] Registered with Consul.`);
 
-
-  app.listen(SERVICE_PORT, '0.0.0.0',() => {
+  app.listen(SERVICE_PORT, '0.0.0.0', () => {
     console.log(`[${SERVICE_NAME}] Running on port ${SERVICE_PORT}`);
   });
 }
