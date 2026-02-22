@@ -1,16 +1,18 @@
-import express, { Express, Request, Response } from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import consul from 'consul';
-import cors from 'cors';
+import express, { Express, Request, Response } from "express";
+import { createProxyMiddleware } from "http-proxy-middleware";
+import consul from "consul";
+import cors from "cors";
 
 const PORT = 8080;
+const SERVICE_NAME = "gateway";
+
 const app: Express = express();
-
-
-const consulClient = new consul({ host: 'localhost', port: '8500' });
 app.use(cors());
 
-
+const consulClient = new consul({
+  host: "localhost",
+  port: "8500",
+});
 
 interface ConsulService {
   Service: string;
@@ -20,45 +22,72 @@ interface ConsulService {
   Tags?: string[];
 }
 
-
-const getServiceUrl = async (serviceName: string): Promise<string> => {
+const registerService = async () => {
   try {
- 
-    const services = await consulClient.agent.service.list() as Record<string, ConsulService>;
+    await consulClient.agent.service.register({
+      name: SERVICE_NAME,
+      id: `${SERVICE_NAME}-${PORT}`,
+      address: "172.22.64.1",
+      port: PORT,
+      check: {
+        http: `http://172.22.64.1:${PORT}/health`,
+        interval: "10s",
+      },
+    });
 
-    const serviceEntry = Object.values(services).find((s: ConsulService) => s.Service === serviceName);
-    
-    if (!serviceEntry) {
-      throw new Error(`Service ${serviceName} not found in Consul`);
-    }
-    
-
-    const host = process.env.NODE_ENV === 'docker' ? serviceEntry.Address : 'localhost';
-    return `http://${host}:${serviceEntry.Port}`;
-  } catch (error) {
-    console.error('Consul lookup failed:', error);
-    throw new Error(`Failed to locate service ${serviceName}`);
+    console.log("Gateway registered in Consul");
+  } catch (err) {
+    console.error("Failed to register gateway:", err);
   }
 };
 
 
-app.use('/api/auth', async (req, res, next) => {
+
+app.get("/health", (req: Request, res: Response) => {
+  res.status(200).json({ status: "ok" });
+});
+
+const getServiceUrl = async (serviceName: string): Promise<string> => {
+  const services = (await consulClient.agent.service.list()) as Record<
+    string,
+    ConsulService
+  >;
+
+  const serviceEntry = Object.values(services).find(
+    (s) => s.Service === serviceName
+  );
+
+  if (!serviceEntry) {
+    throw new Error(`Service ${serviceName} not found in Consul`);
+  }
+
+
+  const host = serviceEntry.Address || "localhost";
+
+  return `http://${host}:${serviceEntry.Port}`;
+};
+
+app.use("/api/auth", async (req, res, next) => {
   try {
-    const target = await getServiceUrl('auth-service');
-    console.log(`Gateway routing to: ${target}`);
-    
-    const proxy = createProxyMiddleware({ 
-      target, 
+    const target = await getServiceUrl("auth-service");
+
+    console.log(`➡️  Gateway routing /api/auth -> ${target}`);
+
+    return createProxyMiddleware({
+      target,
       changeOrigin: true,
-      pathRewrite: { '^/api/auth': '' }, 
-    });
-    
-    proxy(req, res, next);
+      pathRewrite: {
+        "^/api/auth": "",
+      },
+      logLevel: "debug",
+    })(req, res, next);
   } catch (error: any) {
-    res.status(503).json({ error: error.message });
+    console.error("Proxy error:", error.message);
+    return res.status(503).json({ error: error.message });
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`API Gateway running on port ${PORT}`);
+  await registerService(); 
 });

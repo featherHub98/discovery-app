@@ -5,11 +5,12 @@ import cors from 'cors';
 const app = express();
 const PORT = 8888;
 
-// === GitHub configuration for the given repository ===
+
 const GITHUB_OWNER = 'featherHub98';
 const GITHUB_REPO = 'configs';
 const GITHUB_BRANCH = 'main';
 const CONFIG_PATH_PREFIX = ''; 
+
 
 app.use(cors());
 app.use(express.json());

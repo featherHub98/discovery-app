@@ -1,8 +1,8 @@
 import express, { Express } from 'express';
-import { Sequelize } from 'sequelize';
+import mongoose from 'mongoose';
 import consul from 'consul';
 import axios from 'axios';
-import { defineUser } from './models/User';
+
 import { createAuthRoutes } from './routes/authRoutes';
 import cors from 'cors';
 
@@ -26,23 +26,12 @@ async function bootstrap() {
     console.error('Failed to fetch config. Is config-server running?');
     process.exit(1);
   }
+  console.log(config.db.username, config.db.password, config.db.host, config.db.database);
+  const mongoUri = `mongodb://${config.db.username}:${config.db.password}@${config.db.host}:27017/${config.db.database}?authSource=admin`;
+  await mongoose.connect(mongoUri);
+  console.log(`[${SERVICE_NAME}] Database connected.`);
 
-  const sequelize = new Sequelize(
-    config.db.database,
-    config.db.username,
-    config.db.password,
-    {
-      host: config.db.host,
-      dialect: 'postgres',
-      logging: false,
-    }
-  );
-
-  const UserModel = defineUser(sequelize);
-  await sequelize.sync({ alter: true });
-  console.log(`[${SERVICE_NAME}] Database connected & synced.`);
-
-  app.use('/', createAuthRoutes(UserModel, config.jwt.secret));
+  app.use('/', createAuthRoutes(config.jwt.secret));
 
   const consulClient = new consul({ host: 'localhost', port: '8500' });
   await consulClient.agent.service.register({

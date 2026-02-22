@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-// Define the shape of the repository dependency
+
 type AuthRepository = {
   findByUsername: (username: string) => Promise<any>;
   createUser: (username: string, email: string, hash: string) => Promise<any>;

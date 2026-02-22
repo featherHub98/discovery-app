@@ -1,38 +1,39 @@
-import { DataTypes, Model, Sequelize } from 'sequelize';
+import { Schema, model, Document } from 'mongoose';
 
 export type UserAttributes = {
-  id: number;
+  _id?: string;
+  id?: string;
   username: string;
   password: string;
   email: string;
 };
 
-export type UserModel = Model<UserAttributes>;
+export type UserDocument = UserAttributes & Document;
 
-
-export const defineUser = (sequelize: Sequelize) => {
-  return sequelize.define<UserModel>('User', {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
-    },
+const userSchema = new Schema<UserDocument>(
+  {
     username: { 
-      type: DataTypes.STRING, 
-      allowNull: false, 
+      type: String, 
+      required: true, 
       unique: true 
     },
     email: { 
-      type: DataTypes.STRING, 
-      allowNull: false, 
+      type: String, 
+      required: true, 
       unique: true 
     },
     password: { 
-      type: DataTypes.STRING, 
-      allowNull: false 
+      type: String, 
+      required: true 
     },
-  }, {
-    tableName: 'users',
-    timestamps: false,
-  });
-};
+  },
+  { timestamps: false }
+);
+
+userSchema.virtual('id').get(function() {
+  return this._id?.toString();
+});
+
+userSchema.set('toJSON', { virtuals: true });
+
+export const UserModel = model<UserDocument>('User', userSchema);

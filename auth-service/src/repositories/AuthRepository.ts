@@ -1,13 +1,13 @@
 import { UserModel } from '../models/User';
 
-export const createAuthRepository = (userModel: any) => {
+export const createAuthRepository = () => {
   
   const findByUsername = async (username: string) => {
-    return userModel.findOne({ where: { username } });
+    return UserModel.findOne({ username });
   };
 
   const createUser = async (username: string, email: string, hashedPassword: string) => {
-    return userModel.create({ username, email, password: hashedPassword });
+    return UserModel.create({ username, email, password: hashedPassword });
   };
 
   return {
